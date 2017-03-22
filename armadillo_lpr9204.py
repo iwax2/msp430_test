@@ -6,7 +6,6 @@ import serial
 import sys
 from datetime import datetime
 
-f = open('temperature.csv', 'w')
 s = serial.Serial('/dev/ttymxc1', 115200, timeout=1)
 
 try:
@@ -15,20 +14,20 @@ try:
         if( line.startswith('E') ):
             data = line.split()
             if( len(data)>=8 and data[0] == 'ERXDATA' ):
-                date = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
-                dest = data[1]
-                t_h = data[7].split(',')
-                temp = t_h[0]
-                humi = t_h[1]
-                csv = date+','+dest+','+temp+','+humi
+                date    = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
+                send_id = data[1]
+                t_and_h = data[7].split(',')
+                temp    = t_and_h[0]
+                humi    = t_and_h[1]
+                csv     = date+','+ send_id +','+temp+','+humi
                 print(csv)
-                f.write(csv+'\r\n')
+                with open('temperature_'+ send_id +'.csv','a') as f:
+                    f.write(csv+'\r\n')
 except KeyboardInterrupt:
     print("W: interrupt received, stopping script")
 finally:
     print("W: close...")
     s.close()
-    f.close()
 
 sys.exit()
 
