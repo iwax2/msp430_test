@@ -12,6 +12,13 @@ double temperature;
 //SoftwareSerial mySerial(P2_1, P2_2); // RX, TX
 
 void setup() {
+  pinMode(RESET, OUTPUT);
+  pinMode(WAKEUP, OUTPUT);
+  digitalWrite(RESET, LOW);
+  digitalWrite(WAKEUP, LOW);
+  delay(10);
+  digitalWrite(RESET, HIGH);
+  digitalWrite(WAKEUP, HIGH);
   Wire.setModule(0);
   Wire.begin();             // Join I2c Bus as master
   Serial.begin(115200);
@@ -25,30 +32,27 @@ void setup() {
   delay(100);
   Serial.println("SKPING 0001");
   delay(100);
-//  Serial.println("SKSETPS A 0"); // 0秒でwakeup、10秒でsleepの間欠動作
-  pinMode(RESET, OUTPUT);
-  pinMode(WAKEUP, OUTPUT);
-  digitalWrite(RESET, HIGH);
-  digitalWrite(WAKEUP, HIGH);
+  //  Serial.println("SKSETPS A 0"); // 0秒でwakeup、10秒でsleepの間欠動作
 }
 
 
 void loop() {
   wire_hyt221();
-  sleep_all();
+  delay(1000);
+  //sleep_all();
 }
 
 void sleep_all() {
-  Serial.println("SKSYNCREQ 0001");
-  delay(100);
+//  Serial.println("SKSYNCREQ 0001");
+//  delay(100);
   Serial.println("SKSLEEP");
-  delay(30000);
-  Serial.println("SKSEND 1 1000 0001 B 00.00 00.00"); // テスト
-  delay(29000);
+  delay(7000);
+  //  Serial.println("SKSEND 1 1000 0001 B 00.00 00.00"); // テスト
+  //  delay(2900);
   digitalWrite(WAKEUP, LOW);
-  delay(10); // min 5msのWAKEUP入力が必要（立ち上がりエッジで起動）
+  delay(1000); // min 5msのWAKEUP入力が必要（立ち上がりエッジで起動）
   digitalWrite(WAKEUP, HIGH);
-  delay(5); // max 5msで起動
+  delay(1000); // max 5msで起動
 }
 
 void wire_hyt221() {
