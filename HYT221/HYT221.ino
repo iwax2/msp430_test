@@ -3,6 +3,8 @@
 #define HYT_ADDR 0x28
 #define WAKEUP_SEC 0
 #define SLEEP_SEC 10
+#define RESET P2_1
+#define WAKEUP P2_2
 
 char s[12];
 double humidity;
@@ -23,7 +25,11 @@ void setup() {
   delay(100);
   Serial.println("SKPING 0001");
   delay(100);
-  Serial.println("SKSETPS A 0");
+//  Serial.println("SKSETPS A 0"); // 0秒でwakeup、10秒でsleepの間欠動作
+  pinMode(RESET, OUTPUT);
+  pinMode(WAKEUP, OUTPUT);
+  digitalWrite(RESET, HIGH);
+  digitalWrite(WAKEUP, HIGH);
 }
 
 
@@ -35,8 +41,14 @@ void loop() {
 void sleep_all() {
   Serial.println("SKSYNCREQ 0001");
   delay(100);
-//  Serial.println("SKSLEEP");
-  delay(59000);
+  Serial.println("SKSLEEP");
+  delay(30000);
+  Serial.println("SKSEND 1 1000 0001 B 00.00 00.00"); // テスト
+  delay(29000);
+  digitalWrite(WAKEUP, LOW);
+  delay(10); // min 5msのWAKEUP入力が必要（立ち上がりエッジで起動）
+  digitalWrite(WAKEUP, HIGH);
+  delay(5); // max 5msで起動
 }
 
 void wire_hyt221() {
