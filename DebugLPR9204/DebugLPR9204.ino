@@ -3,9 +3,21 @@
 #define WAKEUP P2_2
 #define SERIAL_BUFFER 100
 
+struct packet_t {
+  unsigned int origin; // 受信したデータの送信元ID
+  unsigned int destination; // 受信したデータの宛先ID
+  unsigned int message_id; // 受信したデータの識別信号
+  unsigned int selector; // 宛先セレクタ
+  unsigned int rssi; // 受信RSSI/2-130 = dBm
+  unsigned int data_length; // 受信データ長
+  char *data; // 受信データ内容
+  unsigned int *route; // 受信したデータの途中経路（宛先IDを常に含む）
+};
+
 int countup = 0;
 char serial_read[SERIAL_BUFFER];
 SoftwareSerial sSerial(P2_3, P2_4); // RX, TX
+struct packet_t packet;
 
 void setup() {
   pinMode(RESET, OUTPUT);
@@ -21,26 +33,70 @@ void setup() {
 
 
 void loop() {
-  if ( strcmp(serial_read, "OK") == 0) {
-//  if ( serial_read[0] == 'o') {
-    sSerial.print(serial_read[0], HEX);
-    sSerial.print(serial_read[1], HEX);
-    sSerial.print(serial_read[2], HEX);
-    sSerial.print(serial_read[3], HEX);
-    sSerial.print(serial_read[4], HEX);
-    sSerial.print(serial_read[5], HEX);
-    sSerial.print(serial_read[6], HEX);
-    sSerial.print(serial_read[7], HEX);
-    sSerial.print(serial_read[8], HEX);
-    sSerial.println(serial_read[0], HEX);
-    Serial.println("SKPING 0001");
-  }
-  serial_read[0] = '\0';
   read_serial();
   sSerial.println(serial_read);
+  if ( strcmp(serial_read, "OK") == 0) {
+    //    Serial.println("SKPING 0001");
+  }
+  if ( event_is("ERXDATA") ) {
+    parse_data();
+  }
+}
+
+/*
+   発生したイベントがnameであるかを確かめます
+   nameの長さはSERIAL_BUFFER以下であることを確認してください
+*/
+bool event_is( char* name ) {
+  int len = strlen(name);
+  for ( int i = 0; i < len; i++ ) {
+    if ( name[i] != serial_read[i] ) {
+      return (false);
+    }
+  }
+  return true;
+}
+
+/*
+   発生したERXDATAイベントを解析し，packet構造体に格納します
+*/
+void parse_data() {
+
+}
+
+/*
+   16進文字列をunsigned intに変換します
+*/
+unsigned int hexstr2int( char* hexstr ) {
+  unsigned int data = 0;
+  unsigned int base = 1;
+  int len = strlen(hexstr);
+  for ( int i = 0; i < len; i++ ) {
+    if ( '0' <= hexstr[i] && hexstr[i] <= '9'  ) {
+      data += (hexstr[i] - '0') * base;
+    }
+    base *= 16;
+  }
+  return (data);
+}
+/*
+   unsigned intを指定した文字列数の16進文字列に変換します
+   hexstr = (char *)malloc(sizeof(char)*len+1)
+*/
+char* int2hexstr( char* hexstr, int len, unsigned int data ) {
+  for ( int i = 0; i < len; i++ ) {
+    if ( data > 0 ) {
+      hexstr[i] = data % 16;
+      data /= 16;
+    } else {
+      hexstr[i] = '0';
+    }
+  }
+
 }
 
 void read_serial() {
+  serial_read[0] = '\0';
   int i = 0;
   while (true) {
     if (Serial.available()) {
@@ -54,14 +110,14 @@ void read_serial() {
     }
   }
   /*
-  sSerial.println(serial_read);
-  sSerial.print("Before: ");
-  char l = strlen(serial_read)%10+'0';
-  sSerial.println(l);
-  sSerial.print("After : ");
- l = strlen(serial_read)%10+'0';
-  sSerial.println(l);
-  sSerial.println("Finish read_serial");
+    sSerial.println(serial_read);
+    sSerial.print("Before: ");
+    char l = strlen(serial_read)%10+'0';
+    sSerial.println(l);
+    sSerial.print("After : ");
+    l = strlen(serial_read)%10+'0';
+    sSerial.println(l);
+    sSerial.println("Finish read_serial");
   */
   // CRの削除
   if (strlen(serial_read) > 0) {
