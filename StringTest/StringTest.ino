@@ -24,8 +24,51 @@ void setup() {
 void loop() {
   //                           FROM DEST MID  SEL  RS LEN DATA
   strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 05 12345"); // example
-  parse_data_to_packet();
-  print_packet();
+  if ( event_is("ERXDATA") ) {
+    parse_data_to_packet();
+    print_packet();
+  }
+  delay(1000);
+  strcpy(serial_read, "EACK 0 0002 6231"); // example
+  // いったん送って，ackが返ってくるまで再送する
+  if ( event_is("EACK") ) {
+    if ( packet_is_unreachable() ) {
+      Serial.println("再送");
+    } else {
+      Serial.println("届いたのでSLEEP信号受信待ちに移行");
+    }
+  }
+  delay(1000);
+  strcpy(serial_read, "EACK 1 0002 6231"); // example
+  if ( event_is("EACK") ) {
+    if ( packet_is_unreachable() ) {
+      Serial.println("再送");
+    } else {
+      Serial.println("届いたのでSLEEP信号受信待ちに移行");
+    }
+  }
+  delay(1000);
+  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 09 SLEEP_ALL"); // example
+  if ( event_is("ERXDATA") ) {
+    parse_data_to_packet();
+    print_packet();
+  }
+  if( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
+      Serial.println("再送");
+  } else {
+      Serial.println("SLEEP信号受信待ちのまま待機");
+  }
+  delay(1000);
+  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A SLEEP_0001"); // example
+  if ( event_is("ERXDATA") ) {
+    parse_data_to_packet();
+    print_packet();
+  }
+  if( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
+      Serial.println("再送");
+  } else {
+      Serial.println("SLEEP信号受信待ちのまま待機");
+  }
   delay(1000);
 }
 
@@ -124,6 +167,15 @@ void print_packet() {
   } else {
     Serial.println("There is no route information.");
   }
+}
 
+/*
+   Ackが返ってこない(NACK)状態の時は再送させるため，unreachableならtrue
+*/
+bool packet_is_unreachable() {     // 0123456789012345
+  if (strlen(serial_read) != 16) { // EACK 1 0002 6231
+    return true;
+  }
+  return (serial_read[5] == '0'); // EACKステータスが0ならtrue
 }
 
