@@ -22,54 +22,57 @@ void setup() {
 }
 
 void loop() {
+  Serial.println("Loop start");
   //                           FROM DEST MID  SEL  RS LEN DATA
   strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 05 12345"); // example
   if ( event_is("ERXDATA") ) {
     parse_data_to_packet();
     print_packet();
   }
-  delay(1000);
-  strcpy(serial_read, "EACK 0 0002 6231"); // example
+  delay(10000);
+  strcpy(serial_read, "EACK 0 0002 6231"); // unreachableのexample
   // いったん送って，ackが返ってくるまで再送する
   if ( event_is("EACK") ) {
     if ( packet_is_unreachable() ) {
-      Serial.println("再送");
+      Serial.println("Resend");
     } else {
-      Serial.println("届いたのでSLEEP信号受信待ちに移行");
+      Serial.println("wait for SLEEP signal");
     }
   }
-  delay(1000);
-  strcpy(serial_read, "EACK 1 0002 6231"); // example
+  delay(10000);
+  strcpy(serial_read, "EACK 1 0002 6231"); // ACKが返ってきたときのexample
   if ( event_is("EACK") ) {
     if ( packet_is_unreachable() ) {
-      Serial.println("再送");
+      Serial.println("Resend");
     } else {
-      Serial.println("届いたのでSLEEP信号受信待ちに移行");
+      Serial.println("wait for SLEEP signal");
     }
   }
-  delay(1000);
-  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 09 SLEEP_ALL"); // example
+  delay(10000);
+  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 09 SLEEP_ALL"); // 全ノードSLEEPを受信したとき
   if ( event_is("ERXDATA") ) {
     parse_data_to_packet();
     print_packet();
   }
   if( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
-      Serial.println("再送");
+      Serial.println("start SLEEP");
   } else {
-      Serial.println("SLEEP信号受信待ちのまま待機");
+      Serial.print("unknown packet: ");
+      Serial.println(packet.data);
   }
-  delay(1000);
-  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A SLEEP_0001"); // example
+  delay(10000);
+  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A SLEEP_0001"); // 対象ノードSLEEPを受信したとき
   if ( event_is("ERXDATA") ) {
     parse_data_to_packet();
     print_packet();
   }
   if( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
-      Serial.println("再送");
+      Serial.println("start SLEEP");
   } else {
-      Serial.println("SLEEP信号受信待ちのまま待機");
+      Serial.print("unknown packet: ");
+      Serial.println(packet.data);
   }
-  delay(1000);
+  delay(10000);
 }
 
 /*
@@ -93,32 +96,46 @@ void parse_data_to_packet() {           //     012345678901234567890123456789012
   char s[5];                  //             FROM DEST MID  SEL  RS LEN DATA RUT1 RUT2
   strncpy(s, serial_read + 7, 4); // ERXDATA_0000_0000_0000_0000_00_00_00000_0000_0000
   s[4] = '\0';
+  Serial.print("From: ");
+  Serial.println(s);
   packet.origin = (unsigned int)strtol(s, NULL, 16);
-  strncpy(s, serial_read + 12, 4);
+  strncpy(s, serial_read + 13, 4);
   s[4] = '\0';
+  Serial.print("Dest: ");
+  Serial.println(s);
   packet.destination = (unsigned int)strtol(s, NULL, 16);
-  strncpy(s, serial_read + 17, 4);
+  strncpy(s, serial_read + 18, 4);
   s[4] = '\0';
+  Serial.print("MessageID: ");
+  Serial.println(s);
   packet.message_id = (unsigned int)strtol(s, NULL, 16);
-  strncpy(s, serial_read + 22, 4);
+  strncpy(s, serial_read + 23, 4);
   s[4] = '\0';
+  Serial.print("Selector: ");
+  Serial.println(s);
   packet.selector = (unsigned int)strtol(s, NULL, 16);
-  strncpy(s, serial_read + 27, 2);
+  strncpy(s, serial_read + 28, 2);
   s[2] = '\0';
+  Serial.print("RSSI: ");
+  Serial.println(s);
   packet.rssi = (unsigned int)strtol(s, NULL, 16);
-  strncpy(s, serial_read + 30, 2);
+  strncpy(s, serial_read + 31, 2);
   s[2] = '\0';
+  Serial.print("DataLength: ");
+  Serial.println(s);
   packet.data_length = (unsigned int)strtol(s, NULL, 16);
   free(packet.data);
   packet.data = (char *)malloc(sizeof(char) * (packet.data_length + 1));
-  strncpy(packet.data, serial_read + 33, packet.data_length);
+  strncpy(packet.data, serial_read + 34, packet.data_length);
   packet.data[packet.data_length] = '\0';
+  Serial.print("Data: ");
+  Serial.println(packet.data);
   // ROUTE1からの処理
   free(packet.routes);
   packet.routes = NULL;
   packet.no_routes = 0;
-  if ( strlen(serial_read) > (34 + packet.data_length) ) {
-    int str_begin = 34 + packet.data_length;
+  if ( strlen(serial_read) > (34 + packet.data_length + 1) ) { // スペースの分+1
+    int str_begin = 34 + packet.data_length + 1;
     int str_end = strlen(serial_read);
     int str_length = str_end - str_begin;
     char *str_route = (char *)malloc(sizeof(char) * (str_length + 1));
