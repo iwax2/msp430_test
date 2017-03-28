@@ -22,55 +22,83 @@ void setup() {
 }
 
 void loop() {
-  Serial.println("Loop start");
-  //                           FROM DEST MID  SEL  RS LEN DATA
-  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 05 12345"); // example
-  if ( event_is("ERXDATA") ) {
+  /*
+    Serial.println("Loop start");
+    //                           FROM DEST MID  SEL  RS LEN DATA
+    strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 05 12345"); // example
+    if ( event_is("ERXDATA") ) {
     parse_data_to_packet();
     print_packet();
-  }
-  delay(10000);
-  strcpy(serial_read, "EACK 0 0002 6231"); // unreachableのexample
-  // いったん送って，ackが返ってくるまで再送する
-  if ( event_is("EACK") ) {
+    }
+    delay(10000);
+    strcpy(serial_read, "EACK 0 0002 6231"); // unreachableのexample
+    // いったん送って，ackが返ってくるまで再送する
+    if ( event_is("EACK") ) {
     if ( packet_is_unreachable() ) {
       Serial.println("Resend");
     } else {
       Serial.println("wait for SLEEP signal");
     }
-  }
-  delay(10000);
-  strcpy(serial_read, "EACK 1 0002 6231"); // ACKが返ってきたときのexample
-  if ( event_is("EACK") ) {
+    }
+    delay(1000);
+    strcpy(serial_read, "EACK 1 0002 6231"); // ACKが返ってきたときのexample
+    if ( event_is("EACK") ) {
     if ( packet_is_unreachable() ) {
       Serial.println("Resend");
     } else {
       Serial.println("wait for SLEEP signal");
     }
-  }
-  delay(10000);
-  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 09 SLEEP_ALL"); // 全ノードSLEEPを受信したとき
-  if ( event_is("ERXDATA") ) {
+    }
+    delay(1000);
+    strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 09 SLEEP_ALL"); // 全ノードSLEEPを受信したとき
+    if ( event_is("ERXDATA") ) {
     parse_data_to_packet();
     print_packet();
-  }
-  if( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
-      Serial.println("start SLEEP");
-  } else {
-      Serial.print("unknown packet: ");
-      Serial.println(packet.data);
-  }
-  delay(10000);
-  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A SLEEP_0001"); // 対象ノードSLEEPを受信したとき
-  if ( event_is("ERXDATA") ) {
+    }
+    if ( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
+    Serial.println("start SLEEP");
+    } else {
+    Serial.print("unknown packet: ");
+    Serial.println(packet.data);
+    }
+    delay(1000);
+    strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A SLEEP_0001"); // 対象ノードがSLEEPを受信したとき
+    if ( event_is("ERXDATA") ) {
     parse_data_to_packet();
     print_packet();
+    }
+    if ( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
+    Serial.println("start SLEEP");
+    } else {
+    Serial.print("unknown packet: ");
+    Serial.println(packet.data);
+    }
+    delay(1000);
+    strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A SLEEP_ALL,1,55"); // 対象ノードがSLEEPを受信したとき
+    if ( command_is("SLEEP") ) {
+    Serial.println("start SLEEP");
+    } else {
+    Serial.println("cannot SLEEP");
+    }
+    delay(10000);
+  */
+
+  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A RESEND,0002"); // 再送命令を受けたとき
+  if ( command_is("RESEND") ) {
+    if ( request_for_me(3) ) {
+      Serial.println("Resend");
+    } else {
+      Serial.println("Wait");
+    }
   }
-  if( strcmp(packet.data, "SLEEP_ALL") == 0 ) {
-      Serial.println("start SLEEP");
-  } else {
-      Serial.print("unknown packet: ");
-      Serial.println(packet.data);
+  delay(10000);
+  strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A RESEND,000A"); // 再送命令を受けたとき
+  if ( command_is("RESEND") ) {
+    if ( request_for_me(10) ) {
+      Serial.println("Resend");
+    } else {
+      Serial.println("Wait");
+    }
   }
   delay(10000);
 }
@@ -90,9 +118,42 @@ bool event_is( char* name ) {
 }
 
 /*
+   受信したデータのコマンドがnameであるかを確かめます
+   nameの長さはSERIAL_BUFFER以下であることを確認してください
+*/
+bool command_is( char* name ) {
+  int len = strlen(name);
+  if ( strlen(serial_read) < len + 34 ) {
+    return false;
+  }
+  for ( int i = 0; i < len; i++ ) {
+    if ( name[i] != serial_read[i + 34] ) {
+      return (false);
+    }
+  }
+  return true;
+}
+/*
+   再送メッセージが自分宛かどうか確かめます
+   01234567890123456789012345678901234567890123456789
+   ........FROM DEST MID  SEL  RS LEN DATA
+   ERXDATA_0000_0000_0000_0000_00_00_RESEND,0001\0
+*/
+bool request_for_me( int my_id ) {
+  if ( strlen(serial_read) < 45 ) {
+    return false;
+  }
+  char s[5];
+  strncpy(s, serial_read + 41, 4);
+  s[4] = '\0';
+  int dest_id = (int)strtol(s, NULL, 16);
+  return ( my_id == dest_id );
+}
+
+/*
    発生したERXDATAイベントを解析し，packet構造体に格納します
 */
-void parse_data_to_packet() {           //     01234567890123456789012345678901234567890123456789
+void parse_data_to_packet() { //     01234567890123456789012345678901234567890123456789
   char s[5];                  //             FROM DEST MID  SEL  RS LEN DATA RUT1 RUT2
   strncpy(s, serial_read + 7, 4); // ERXDATA_0000_0000_0000_0000_00_00_00000_0000_0000
   s[4] = '\0';
