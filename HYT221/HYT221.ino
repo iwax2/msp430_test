@@ -1,47 +1,56 @@
+//#include <SoftwareSerial.h>
 #include <Wire.h>
 #include "lpr9204.h"
 #define HYT_ADDR 0x28
+#define BAUDRATE 9600
 
-char s[12];
 double humidity;
 double temperature;
-int message_id = 0;
+int packet_id = 0;
 int my_id = 0;
+//SoftwareSerial sSerial(P2_3, P2_4); // RX, TX
 
 void setup() {
-  pinMode(RED_LED, OUTPUT);
+  Serial.begin(BAUDRATE); // Communication with LPR9204
+  //  sSerial.begin(9600); // ソフトウェアシリアルの初期化
+  //  sSerial.println("Ready");
+  delay(1000);
   while (my_id == 0) {
     my_id = init_lpr9204();
-    digitalWrite(LED, LOW);
   }
-  digitalWrite(LED, HIGH);
   Wire.setModule(0);
   Wire.begin();
+  pinMode(RED_LED, OUTPUT);
+  digitalWrite(RED_LED, HIGH);
 }
 
 void loop() {
-  int sleep_time = 60;
+  int sleep_time = 1;
   awake_lpr9204();
-  get_temperature_by_wire;
-  send_temperature_until_ack_lpr9204( message_id, temperature, humidity );
-  while (1) {
+  get_temperature_by_wire();
+  int no_resend = send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
+  
+  /*
+    while (1) {
     read_serial();
+    sSerial.println(get_serial_read());
     if ( event_is("ERXDATA") ) {
       if ( command_is("RESEND") ) {
-        if ( request_fo_me(my_id) ) {
-          send_temperature_until_ack_lpr9204( message_id, temperature, humidity );
+        if ( request_for_me(my_id) ) {
+          send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
         }
       } else if ( command_is("SLEEP") ) {
-        message_id = get_message_id(); // n+1される
+        packet_id = get_packet_id(); // n+1される
         sleep_time = get_sleep_time();
         break;
       }
-      //      parse_data_to_packet();
     }
-  }
-  delay(1000);
-  sleep_lpr9204();
-  delay( sleep_time*1000 );
+    delay(100);
+    }
+    delay(1000);
+    sleep_lpr9204();
+  */
+  delay( sleep_time * 1000 );
 }
 
 
@@ -64,9 +73,9 @@ bool get_temperature_by_wire() {
     int rawTemperature = b3 << 6 | b4;
     temperature = 165.0 / pow(2, 14) * rawTemperature - 40;
 
-    //    Serial.print(humidity);
-    //    Serial.print("% - Temperature: ");
-    //    Serial.println(temperature);
+    //    sSerial.print(humidity);
+    //    sSerial.print("% - Temperature: ");
+    //    sSerial.println(temperature);
     is_available = true;
   } else {
     //    Serial.println("Not enough bytes available on wire.");

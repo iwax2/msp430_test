@@ -13,6 +13,11 @@ struct packet_t {
 
 char serial_read[SERIAL_BUFFER];
 struct packet_t packet;
+char send_data[35] = "SKSEND 1 1000 0001 D 0,00.00,00.00";
+
+double temp = 20.00;
+double humi = 90.03;
+int packet_id = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -81,8 +86,6 @@ void loop() {
     Serial.println("cannot SLEEP");
     }
     delay(10000);
-  */
-
   strcpy(serial_read, "ERXDATA 0001 0002 6231 1000 DD 0A RESEND,0002"); // 再送命令を受けたとき
   if ( command_is("RESEND") ) {
     if ( request_for_me(3) ) {
@@ -100,7 +103,13 @@ void loop() {
       Serial.println("Wait");
     }
   }
-  delay(10000);
+  */
+  send_temperature_lpr9204( packet_id, temp, humi );
+  packet_id = (packet_id+1)%10;
+  temp += 0.12;
+  humi += 0.232;
+
+  delay(1000);
 }
 
 /*
@@ -256,4 +265,34 @@ bool packet_is_unreachable() {     // 0123456789012345
   }
   return (serial_read[5] == '0'); // EACKステータスが0ならtrue
 }
+
+
+// 01234567890123456789012345678901234
+// SKSEND 1 1000 0001 D n,22.22,55.55\0
+void send_temperature_lpr9204( int n, double temp, double humi ) {
+  send_data[21] = n + '0';
+  send_data[22] =',';
+  d22tostr( 23, temp );
+  send_data[28] =',';
+  d22tostr( 29, humi );
+  Serial.println(send_data);
+}
+
+/*
+   2.2fにfscanfします
+*/
+void d22tostr( int index, double d ) {
+  char c1 = (int)(d / 10) % 10 + '0';
+  char c2 = (int)d % 10 + '0';
+  char c3 = (int)(d * 10) % 10 + '0';
+  char c4 = (int)(d * 100) % 10 + '0';
+  send_data[index+0] = c1;
+  send_data[index+1] = c2;
+  send_data[index+2] = '.';
+  send_data[index+3] = c3;
+  send_data[index+4] = c4;
+}
+
+
+
 

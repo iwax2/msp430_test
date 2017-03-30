@@ -1,14 +1,16 @@
 #ifndef _lpr9204_h
 #define _lpr9204_h
 
-#define SERIAL_BUFFER 100
+#include"arduino.h"
+#include<string.h>
+#include<stdlib.h>
 
-#define WAKEUP_SEC 0
-#define SLEEP_SEC 10
+#define SERIAL_BUFFER 60
+#define MAX_RESEND 10
+
 #define RESET P2_1
 #define WAKEUP P2_2
 
-#define MAX_RESEND 10
 
 struct packet_t {
   unsigned int origin; // 受信したデータの送信元ID
@@ -22,23 +24,22 @@ struct packet_t {
   unsigned int no_routes; // ホップ数
 };
 
-char serial_read[SERIAL_BUFFER];
-struct packet_t packet;
-
 
 int init_lpr9204();
 bool event_is( char* name );
 bool command_is( char* name );
 bool request_for_me( int my_id );
-int get_message_id();
+int get_packet_id();
 int get_sleep_time();
 bool ack_is_available();
-void read_serial();
+bool read_serial( int timeout );
 void parse_data_to_packet();
 void print_packet();
-void send_temperature_until_ack_lpr9204( int n, double temp, double humi );
+int send_temperature_until_ack_lpr9204( int n, double temp, double humi );
 void send_temperature_lpr9204( int n, double temp, double humi );
 void sleep_lpr9204();
 void awake_lpr9204();
+char* get_serial_read();
+void d22tostr( int index, double d );
 
 #endif
