@@ -37,6 +37,7 @@ void parse_data_to_packet();
 void print_packet();
 int send_temperature_until_ack_lpr9204( int n, double temp, double humi );
 void send_temperature_lpr9204( int n, double temp, double humi );
+void send_debug_message( int error_no );
 void sleep_lpr9204();
 void awake_lpr9204();
 char* get_serial_read();

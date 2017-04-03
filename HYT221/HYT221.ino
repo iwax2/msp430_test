@@ -4,52 +4,66 @@
 #define HYT_ADDR 0x28
 #define BAUDRATE 9600
 
-double humidity;
-double temperature;
+double humidity = 98.76;
+double temperature = 12.34;
 int packet_id = 0;
 int my_id = 0;
 //SoftwareSerial sSerial(P2_3, P2_4); // RX, TX
 
 void setup() {
+  pinMode(RED_LED, OUTPUT);
+  digitalWrite(RED_LED, LOW);
   Serial.begin(BAUDRATE); // Communication with LPR9204
   //  sSerial.begin(9600); // ソフトウェアシリアルの初期化
   //  sSerial.println("Ready");
-  delay(1000);
   while (my_id == 0) {
     my_id = init_lpr9204();
   }
   Wire.setModule(0);
   Wire.begin();
-  pinMode(RED_LED, OUTPUT);
-  digitalWrite(RED_LED, HIGH);
 }
 
 void loop() {
-  int sleep_time = 1;
+  int sleep_time = 10;
   awake_lpr9204();
-  get_temperature_by_wire();
+  digitalWrite(RED_LED, HIGH);
+  delay(100);
+  //  get_temperature_by_wire();
   int no_resend = send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
-  
-  /*
-    while (1) {
-    read_serial();
-    sSerial.println(get_serial_read());
+
+  while (1) {
+    if ( !read_serial(30 * 1000) ) { // 30秒以上応答がなければbreakする
+      break;
+    }
     if ( event_is("ERXDATA") ) {
+      digitalWrite(RED_LED, LOW);
+      delay(100);
+      digitalWrite(RED_LED, HIGH);
       if ( command_is("RESEND") ) {
         if ( request_for_me(my_id) ) {
           send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
         }
       } else if ( command_is("SLEEP") ) {
-        packet_id = get_packet_id(); // n+1される
-        sleep_time = get_sleep_time();
+        int p = get_packet_id();
+        if ( p < 0 ) {
+          packet_id = (packet_id + 1) % 10; // n+1される
+        } else {
+          packet_id = p;
+        }
+        int s = get_sleep_time();
+        if ( s == 0 ) {
+          sleep_time = 60;
+        } else {
+          sleep_time = s;
+        }
         break;
       }
     }
     delay(100);
-    }
-    delay(1000);
-    sleep_lpr9204();
-  */
+  }
+  delay(1000);
+  digitalWrite(RED_LED, LOW);
+  sleep_lpr9204();
   delay( sleep_time * 1000 );
 }
 

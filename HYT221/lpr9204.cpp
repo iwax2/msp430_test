@@ -1,9 +1,9 @@
 #include "lpr9204.h"
 
 char serial_read[SERIAL_BUFFER];
-//                    01234567890123456789012345678901234
-//                    SKSEND 1 1000 0001 D n,22.22,55.55\0
-char send_data[35] = "SKSEND 1 1000 0001 D              ";
+//                    012345678901234567890123456789012345
+//                    SKSEND 1 1000 0001 0D n,22.22,55.55\0
+char send_data[36] = "SKSEND 1 1000 0001 0D              ";
 struct packet_t packet;
 
 /*
@@ -71,7 +71,7 @@ int get_packet_id() {
   return -1;
 }
 int get_sleep_time() {
-  int sleep_time = 60;
+  int sleep_time = 0;
   if ( strlen(serial_read) < 48 ) {
     return sleep_time;
   }
@@ -88,29 +88,32 @@ int get_sleep_time() {
 /*
    ACKが返ってきたらtrue
 */
-bool ack_is_available() {          // 0123456789012345
-  if (strlen(serial_read) != 16) { // EACK 1 0002 6231
+bool ack_is_available() {        // 0123456789012345
+  if (strlen(serial_read) < 6) { // EACK 1 0002 6231
     return false;
   }
-  digitalWrite(RED_LED, LOW);
-  delay(1000);
-  digitalWrite(RED_LED, HIGH);
-
-
-  return (serial_read[5] == '1'); // EACKステータスが1ならtrue
+  if ( serial_read[5] == '1' ) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /*
    データを受信待ちにします
    timeoutを超えるとfalseを返して読み込みを中止します
    timeoutに-1を指定すると無制限にデータを待ち続けます
+   timeout=10,000で15秒ぐらいなので/1.5してdelayに合わせる
 */
 bool read_serial( int timeout ) {
   int t = 0;
   int i = 0;
+  if ( timeout > 1 ) {
+    timeout = (int)(timeout / 1.5);
+  }
   serial_read[0] = '\0';
   while ( true ) {
-    if (Serial.available()) {
+    if ( Serial.available() > 0) {
       char c = Serial.read();
       if ( i >= (SERIAL_BUFFER - 1) || c == '\n' ) {
         serial_read[i] = '\0';
@@ -119,6 +122,8 @@ bool read_serial( int timeout ) {
         serial_read[i++] = c;
       }
     } else if ( t >= timeout && timeout > 0 ) {
+      //      sSerial.print(t);
+      //      sSerial.println(" times Timeout!");
       return false;
     } else {
       t++;
@@ -129,9 +134,9 @@ bool read_serial( int timeout ) {
   if (strlen(serial_read) > 0) {
     serial_read[strlen(serial_read) - 1] = '\0';
   }
+  //  sSerial.println(serial_read);
   return true;
 }
-
 
 
 /*
@@ -215,6 +220,9 @@ void print_packet() {
   }
 }
 
+/*
+   Ackが返ってくるまで温湿度を再送します（MAX_RESENDまで）
+*/
 int send_temperature_until_ack_lpr9204( int n, double temp, double humi ) {
   int no_resend = 0;
   while ( no_resend < MAX_RESEND ) {
@@ -226,9 +234,6 @@ int send_temperature_until_ack_lpr9204( int n, double temp, double humi ) {
       }
     }
     if ( ack_is_available() ) {
-      digitalWrite(RED_LED, LOW);
-      delay(100);
-      digitalWrite(RED_LED, HIGH);
       break;
     }
     delay(100);
@@ -237,29 +242,61 @@ int send_temperature_until_ack_lpr9204( int n, double temp, double humi ) {
   return (no_resend);
 }
 
+/*
+  012345678901234567890123456789012345
+  SKSEND 1 1000 0001 0D n,22.22, 55.55\0
+  char send_data[36] = "SKSEND 1 1000 0001 0D              ";
+*/
+
 void send_temperature_lpr9204( int n, double temp, double humi ) {
-  send_data[21] = n + '0';
-  send_data[22] = ',';
-  d22tostr( 23, temp );
-  send_data[28] = ',';
-  d22tostr( 29, humi );
+  send_data[22] = n + '0';
+  send_data[23] = ',';
+  d22tostr( 24, temp );
+  send_data[29] = ',';
+  d22tostr( 30, humi );
+  Serial.flush();
   Serial.println(send_data);
+  Serial.flush();
   //  sSerial.println(send_data);
 }
+
+void send_debug_message( int error_no ) {
+  Serial.flush();
+  if ( error_no == 0 ) {
+    Serial.println("SKSEND 1 1000 0001 32 Debug:");
+  } else if ( error_no == 1 ) {
+    Serial.println("SKSEND 1 1000 0001 32 Sleep");
+  } else if ( error_no == 2 ) {
+    Serial.println("SKSEND 1 1000 0001 32 Resend");
+  }
+  Serial.flush();
+}
+
 
 /*
    2.2fにfscanfします
 */
 void d22tostr( int index, double d ) {
-  char c1 = (int)(d / 10) % 10 + '0';
-  char c2 = (int)d % 10 + '0';
-  char c3 = (int)(d * 10) % 10 + '0';
-  char c4 = (int)(d * 100) % 10 + '0';
+  char c1, c2, c3, c4, c5;
+  if ( d >= 0) {
+    c1 = (int)(d / 10) % 10 + '0';
+    c2 = (int)d % 10 + '0';
+    c3 = '.';
+    c4 = (int)(d * 10) % 10 + '0';
+    c5 = (int)(d * 100) % 10 + '0';
+  } else {
+    d *= -1;
+    c1 = '-';
+    c2 = (int)(d / 10) % 10 + '0';
+    c3 = (int)d % 10 + '0';
+    c4 = '.';
+    c5 = (int)(d * 10) % 10 + '0';
+  }
   send_data[index + 0] = c1;
   send_data[index + 1] = c2;
-  send_data[index + 2] = '.';
-  send_data[index + 3] = c3;
-  send_data[index + 4] = c4;
+  send_data[index + 2] = c3;
+  send_data[index + 3] = c4;
+  send_data[index + 4] = c5;
 }
 
 
@@ -283,9 +320,10 @@ int init_lpr9204() {
   delay(10);
   digitalWrite(RESET, HIGH);
   digitalWrite(WAKEUP, HIGH);
-  read_serial(-1); // Welcome
+  read_serial(1000); // Welcome
   Serial.println("SKINFO");
-  for ( int i = 0; i < 3; i++ ) {
+  // SKINFOの応答はEINFOとOKがあり得る
+  for ( int i = 0; i < 2; i++ ) {
     read_serial(1000);
     if ( event_is("EINFO") ) {
       char s[5];
