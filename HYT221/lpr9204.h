@@ -28,7 +28,7 @@ struct packet_t {
 int init_lpr9204();
 bool event_is( char* name );
 bool command_is( char* name );
-bool request_for_me( int my_id );
+int request_for_me( int my_id );
 int get_packet_id();
 int get_sleep_time();
 bool ack_is_available();
@@ -40,7 +40,6 @@ void send_temperature_lpr9204( int n, double temp, double humi );
 void send_debug_message( int error_no );
 void sleep_lpr9204();
 void awake_lpr9204();
-char* get_serial_read();
 void d22tostr( int index, double d );
 
 #endif

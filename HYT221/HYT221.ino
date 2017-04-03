@@ -33,15 +33,17 @@ void loop() {
 
   while (1) {
     if ( !read_serial(30 * 1000) ) { // 30秒以上応答がなければbreakする
+      sleep_time = 30;
       break;
     }
     if ( event_is("ERXDATA") ) {
       digitalWrite(RED_LED, LOW);
       delay(100);
       digitalWrite(RED_LED, HIGH);
-      if ( command_is("RESEND") ) {
-        if ( request_for_me(my_id) ) {
-          send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
+      if ( command_is("RSEND") ) {
+        int pid = request_for_me(my_id);
+        if ( pid > 0 ) {
+          send_temperature_until_ack_lpr9204( pid, temperature, humidity );
         }
       } else if ( command_is("SLEEP") ) {
         int p = get_packet_id();
@@ -52,14 +54,14 @@ void loop() {
         }
         int s = get_sleep_time();
         if ( s == 0 ) {
-          sleep_time = 60;
+          sleep_time = 50;
         } else {
           sleep_time = s;
         }
         break;
       }
     }
-    delay(100);
+    //    delay(100);
   }
   delay(1000);
   digitalWrite(RED_LED, LOW);
@@ -97,6 +99,16 @@ bool get_temperature_by_wire() {
   }
   Wire.endTransmission();           // End transmission and release I2C bus
   return (is_available);
+}
+
+bool blink_times( int times ) {
+  for ( int i = 0; i < times; i++ ) {
+    digitalWrite(RED_LED, HIGH);
+    delay(100);
+    digitalWrite(RED_LED, LOW);
+    delay(100);
+  }
+
 }
 
 
