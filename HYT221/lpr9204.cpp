@@ -111,7 +111,7 @@ int get_packet_id() {
 */
 int get_sleep_time() {
   int sleep_time = 0;
-  if ( strlen(serial_read) < 49 ) {
+  if ( strlen(serial_read) < 48 ) {
     return sleep_time;
   }
   if ( '0' <= serial_read[47] && serial_read[47] <= '9' ) {

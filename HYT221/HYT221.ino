@@ -37,16 +37,16 @@ void loop() {
       break;
     }
     if ( event_is("ERXDATA") ) {
-      digitalWrite(RED_LED, LOW);
-      delay(100);
-      digitalWrite(RED_LED, HIGH);
+      //      blink_times(1);
       if ( command_is("RSEND") ) {
+        //        blink_times(5);
         int pid = request_for_me(my_id);
         if ( pid > 0 ) {
           send_temperature_until_ack_lpr9204( pid, temperature, humidity );
         }
       } else if ( command_is("SLEEP") ) {
         int p = get_packet_id();
+        blink_times(p + 1);
         if ( p < 0 ) {
           packet_id = (packet_id + 1) % 10; // n+1される
         } else {
@@ -65,8 +65,12 @@ void loop() {
   }
   delay(1000);
   digitalWrite(RED_LED, LOW);
+  //  delay(3000);
+  //  blink_times(sleep_time);
   sleep_lpr9204();
-  delay( sleep_time * 1000 );
+  for ( int i = 0; i < 100; i++ ) {
+    delay( sleep_time * 10 );
+  }
 }
 
 
@@ -104,10 +108,11 @@ bool get_temperature_by_wire() {
 bool blink_times( int times ) {
   for ( int i = 0; i < times; i++ ) {
     digitalWrite(RED_LED, HIGH);
-    delay(100);
+    delay(200);
     digitalWrite(RED_LED, LOW);
-    delay(100);
+    delay(200);
   }
+  digitalWrite(RED_LED, HIGH);
 
 }
 
