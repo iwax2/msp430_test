@@ -96,38 +96,55 @@ def automatic_repeat_request(e, packet_number):
  メソッド側で改行コードは面倒を見ます
 '''
 def send_packet( command ):
-    serial_command = command + "\r\n"
     s.flush()
     ack_message_queue.clear()
     message_id_queue.clear()
     error_code_queue.clear()
+    sent_message_id = set()
+    message_id = _send_packet_and_get_message_id( command )
+    sent_message_id.add(message_id)
+    number_of_sent_packets = 1
+    while number_of_sent_packets < 5:
+        if( len(ack_message_queue) > 0 ):
+            if( pop_ack_message( sent_message_id ) == '1' ):
+                break
+            elif( len(ack_message_queue) < 1 ): # ackキューが空なら再送
+                print("[Resend because of  nack] "+command)
+                sleep(2)
+                message_id = _send_packet_and_get_message_id( command )
+                sent_message_id.add(message_id)
+                number_of_sent_packets += 1
+        elif( len(error_code_queue) > 0 ): # エラーメッセージがでたときは再送
+            error_message = error_code_queue.popleft()
+            print("[Resend because of error] "+command+" / "+error_message)
+            message_id = _send_packet_and_get_message_id( command )
+            sent_message_id.add(message_id)
+            number_of_sent_packets += 1
+
+'''
+ パケットを送信してメッセージIDを取得します
+'''
+def _send_packet_and_get_message_id( command ):
     print(command)
+    serial_command = command + "\r\n"
     s.write(serial_command.encode('utf-8'))
     message_id = "" # ランダムの4桁16進値。SKSENDを発行したらMSG_ID OKの形で返ってくる（ハズ
     while True:
         if( len(message_id_queue) > 0 ):
             message_id = message_id_queue.popleft()
-            break
-    while True:
-        if( len(ack_message_queue) > 0 ):
-            if( pop_ack_message( message_id ) == '1' ):
-                break
-            else:
-                print("[Resend because of  nack] "+command)
-                s.flush()
-                s.write(serial_command.encode('utf-8'))
-        elif( len(error_code_queue) > 0 ): # エラーメッセージがでたときは再送
-            print("[Resend because of error] "+command)
-            s.flush()
-            s.write(serial_command.encode('utf-8'))
+            return message_id
+    return None
 
 '''
  ack_message_queueから対象のmessage_idを含むACK結果を取り出して返します
 '''
-def pop_ack_message( message_id ):
+def pop_ack_message( sent_message_id ):
     for ack in ack_message_queue: # ack[0] = STATUS, ack[1] = MSG_ID
-        if( ack[1] == message_id ):
+        print("Test : " + ack[1]+ " / Target :", end="")
+        print(sent_message_id)
+        if( ack[1] in sent_message_id ):
             ack_message_queue.remove(ack)
+            sent_message_id.remove(ack[1])
             return ack[0] # ack_status '0' or '1'
     return '0' # ACKが受け取れていないので'0'を返して再送
 
@@ -153,10 +170,10 @@ try:
         date = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
         for packet in accepted_packets:
             csv = date+','+','+packet[2]+','+packet[3] # packet = (send_id, packet_number, temp, humi)
-            with open('temperature_'+ packet[0] +'.csv','a') as f:
-                f.write(csv+'\r\n')
+#            with open('temperature_'+ packet[0] +'.csv','a') as f:
+#                f.write(csv+'\r\n')
         accepted_packets.clear()
-        print("[Information] Sleep....")
+        print("[Information] Sleep...."+str(sleep_time)+" s")
         sleep(sleep_time)
         print("[Information] Wakeup!")
 
@@ -165,8 +182,8 @@ except KeyboardInterrupt:
 finally:
     print("W: close...")
     s.close()
-e.set()
-
+e_rec.set()
+e_arq.set()
 th_rec.join()
 
 sys.exit()
