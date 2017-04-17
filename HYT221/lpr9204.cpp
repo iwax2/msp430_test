@@ -7,8 +7,8 @@ char send_data[36] = "SKSEND 1 1000 0001 0D              ";
 struct packet_t packet;
 
 /*
- * LPR9204の初期設定
- */
+   LPR9204の初期設定
+*/
 int init_lpr9204() {
   int my_id = 0;
   pinMode(RESET, OUTPUT);
@@ -83,7 +83,11 @@ int request_for_me( int my_id ) {
   strncpy(s, serial_read + 40, 4);
   s[4] = '\0';
   int dest_id = (int)strtol(s, NULL, 16);
-  return ( get_packet_id() );
+  if ( dest_id == my_id ) {
+    return ( get_packet_id() );
+  } else {
+    return -1;
+  }
 }
 
 /*
@@ -161,8 +165,6 @@ bool read_serial( int timeout ) {
         serial_read[i++] = c;
       }
     } else if ( t >= timeout && timeout > 0 ) {
-      //      sSerial.print(t);
-      //      sSerial.println(" times Timeout!");
       return false;
     } else {
       t++;
@@ -173,7 +175,6 @@ bool read_serial( int timeout ) {
   if (strlen(serial_read) > 0) {
     serial_read[strlen(serial_read) - 1] = '\0';
   }
-  //  sSerial.println(serial_read);
   return true;
 }
 
@@ -184,8 +185,8 @@ int send_temperature_until_ack_lpr9204( int n, double temp, double humi ) {
   int no_resend = 0;
   while ( no_resend < MAX_RESEND ) {
     send_temperature_lpr9204( n, temp, humi ); // データを送る
-    for ( int m = 0; m < 3; m++ ) {
-      read_serial(1000); // ACKを待つ。615B OKなどの応答もある
+    for ( int m = 0; m < 5; m++ ) {
+      read_serial(1000); // ACKを待つ。エコーバックや615B OK, ERXDATAなどの応答もある
       if ( event_is("EACK") ) {
         break;
       }
@@ -214,7 +215,6 @@ void send_temperature_lpr9204( int n, double temp, double humi ) {
   Serial.flush();
   Serial.println(send_data);
   Serial.flush();
-  //  sSerial.println(send_data);
 }
 
 void send_debug_message( int error_no ) {
@@ -258,7 +258,9 @@ void d22tostr( int index, double d ) {
 
 
 void sleep_lpr9204() {
+  Serial.flush();
   Serial.println("SKSLEEP");
+  Serial.flush();
 }
 
 void awake_lpr9204() {
@@ -266,6 +268,7 @@ void awake_lpr9204() {
   delay(10); // min 5msのWAKEUP入力が必要（立ち上がりエッジで起動）
   digitalWrite(WAKEUP, HIGH);
   delay(10); // max 5msで起動
+  read_serial( 1000 ); // EWAKEやSKSLEEPを受け取る
 }
 
 

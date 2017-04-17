@@ -8,11 +8,11 @@
 #define SERIAL_BUFFER 60
 #define MAX_RESEND 10
 
-#define RESET P2_1
-#define WAKEUP P2_2
-//#define RED_LED 13
-//#define RESET 2
-//#define WAKEUP 3
+//#define RESET P2_1
+//#define WAKEUP P2_2
+#define RED_LED 13
+#define RESET 2
+#define WAKEUP 3
 
 
 struct packet_t {

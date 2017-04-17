@@ -1,4 +1,3 @@
-//#include <SoftwareSerial.h>
 #include <Wire.h>
 #include "lpr9204.h"
 #define HYT_ADDR 0x28
@@ -8,14 +7,11 @@ double humidity = 98.76;
 double temperature = 12.34;
 int packet_id = 0;
 int my_id = 0;
-//SoftwareSerial sSerial(P2_3, P2_4); // RX, TX
 
 void setup() {
   pinMode(RED_LED, OUTPUT);
   digitalWrite(RED_LED, LOW);
   Serial.begin(BAUDRATE); // Communication with LPR9204
-  //  sSerial.begin(9600); // ソフトウェアシリアルの初期化
-  //  sSerial.println("Ready");
   while (my_id == 0) {
     my_id = init_lpr9204();
   }
@@ -26,22 +22,21 @@ void setup() {
 void loop() {
   int sleep_time = 10;
   awake_lpr9204();
-  digitalWrite(RED_LED, HIGH);
+  digitalWrite(RED_LED, LOW);
   delay(100);
-  //  get_temperature_by_wire();
+//  get_temperature_by_wire();
   int no_resend = send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
 
   while (1) {
     if ( !read_serial(30 * 1000) ) { // 30秒以上応答がなければbreakする
       sleep_time = 30;
+      packet_id = (packet_id + 1) % 10; // n+1される
       break;
     }
     if ( event_is("ERXDATA") ) {
-      //      blink_times(1);
       if ( command_is("RSEND") ) {
-        //        blink_times(5);
-        int pid = request_for_me(my_id);
-        if ( pid > 0 ) {
+        int pid = request_for_me(my_id); // packet_IDは0～9
+        if ( pid >= 0 ) {
           send_temperature_until_ack_lpr9204( pid, temperature, humidity );
         }
       } else if ( command_is("SLEEP") ) {
@@ -61,13 +56,12 @@ void loop() {
         break;
       }
     }
-    //    delay(100);
   }
   delay(1000);
-  digitalWrite(RED_LED, LOW);
   //  delay(3000);
   //  blink_times(sleep_time);
   sleep_lpr9204();
+  digitalWrite(RED_LED, HIGH);
   for ( int i = 0; i < 100; i++ ) {
     delay( sleep_time * 10 );
   }
