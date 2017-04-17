@@ -75,10 +75,12 @@ def automatic_repeat_request(e, packet_number):
                 print(data)
     accepted_node_list = [] # 対象のパケット番号で受理したパケットの管理用
     start_sec = datetime.now().second
+    # 管理していないノードから送られてきたパケットも受け取ってしまうので長さだとほしいデータがとれないかも
     while( len(accepted_packets) < len(coordinate) and not e.isSet() ):
         if( len(received_packets)>0 ):
             packet = received_packets.popleft()
             if( packet[1] == packet_number ):
+                # ここで対象ノード以外からのパケットははじく？
                 accepted_packets.append(packet)
                 accepted_node_list.append(packet[0])
                 print("Packet is captured from : " + packet[0])
@@ -89,7 +91,7 @@ def automatic_repeat_request(e, packet_number):
                 start_sec = datetime.now().second # 前回の実行から10秒以上経っていれば再送要求する
                 for node in coordinate:
                     if node not in accepted_node_list:
-                        send_packet("SKSEND 1 1000 0002 0C RSEND,"+node+","+str(packet_number))
+                        send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
 
 '''
  パケット送信（再送制御つき）
@@ -106,9 +108,10 @@ def send_packet( command ):
     number_of_sent_packets = 1
     while number_of_sent_packets < 5:
         if( len(ack_message_queue) > 0 ):
-            if( pop_ack_message( sent_message_id ) == '1' ):
+            ack_message = pop_ack_message( sent_message_id )
+            if( ack_message == '1' ):
                 break
-            elif( len(ack_message_queue) < 1 ): # ackキューが空なら再送
+            elif( len(ack_message_queue) < 1 or ack_message == '0' ): # ackキューが空/ackメッセージが0なら再送
                 print("[Resend because of  nack] "+command)
                 sleep(2)
                 message_id = _send_packet_and_get_message_id( command )
@@ -120,6 +123,21 @@ def send_packet( command ):
             message_id = _send_packet_and_get_message_id( command )
             sent_message_id.add(message_id)
             number_of_sent_packets += 1
+
+'''
+ ブロードキャスト送信（再送制御なし）
+ メソッド側で改行コードは面倒を見ます
+'''
+def broadcast_packet( command ):
+    # ブロードキャストはACKが返ってこないので3回ほど送信する
+    for i in range(0,2):
+        message_id = _send_packet_and_get_message_id( command )
+        if( len(error_code_queue) > 0 ): # エラーメッセージがでたときは再送
+            error_message = error_code_queue.popleft()
+            print("[Resend because of error] "+command+" / "+error_message)
+            message_id = _send_packet_and_get_message_id( command )
+        sleep(1)
+
 
 '''
  パケットを送信してメッセージIDを取得します
@@ -139,6 +157,8 @@ def _send_packet_and_get_message_id( command ):
  ack_message_queueから対象のmessage_idを含むACK結果を取り出して返します
 '''
 def pop_ack_message( sent_message_id ):
+    print("POP ack message : ", end="")
+    print(ack_message_queue)
     for ack in ack_message_queue: # ack[0] = STATUS, ack[1] = MSG_ID
         print("Test : " + ack[1]+ " / Target :", end="")
         print(sent_message_id)
@@ -165,8 +185,8 @@ try:
         e_arq.set()
         packet_number = ( packet_number+1 ) % 10
         sleep_time = 60 - datetime.now().second
-        # SLEEPを送るのはブロードキャストになると思うので別メソッドになる（予定）
-        send_packet("SKSEND 1 1000 0002 0F SLEEP_ALL_,"+str(packet_number)+","+str(sleep_time))
+        # SLEEPはブロードキャスト（最大3ホップ）で送信
+        broadcast_packet("SKBC 3 1000 0F SLEEP_ALL_,"+str(packet_number)+","+str(sleep_time))
         date = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
         for packet in accepted_packets:
             csv = date+','+','+packet[2]+','+packet[3] # packet = (send_id, packet_number, temp, humi)
