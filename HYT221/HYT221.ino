@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include "lpr9204.h"
 #define HYT_ADDR 0x28
-#define BAUDRATE 9600
+#define BAUDRATE 115200
 
 double humidity = 98.76;
 double temperature = 12.34;
@@ -24,7 +24,7 @@ void loop() {
   awake_lpr9204();
   digitalWrite(RED_LED, LOW);
   delay(100);
-//  get_temperature_by_wire();
+  get_temperature_by_wire();
   int no_resend = send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
 
   while (1) {
