@@ -14,24 +14,22 @@ import matplotlib.cm as cm # カラーバーの設定
 
 # 参考 http://www.mwsoft.jp/programming/numpy/csv.html
 data = np.loadtxt("assmann_20170302.txt", delimiter="\t", dtype=np.float64, usecols=(0,1,2)) # , filling_values=(0, 0, 0) 
+#data = np.loadtxt("windspeed_test.txt", delimiter="\t", dtype=np.float64, usecols=(0,1,2)) # , filling_values=(0, 0, 0) 
 
 # 参考 http://www.mwsoft.jp/programming/numpy/csv.html
 x = data[:,0]
 y = data[:,1]
 z = data[:,2]
 
-print(x)
-print(y)
-print(z)
-print(len(x),len(y),len(z))
 
-# 2次元のスプライン補間
+# 2D補間
 # https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html#id1
-XI, YI = np.meshgrid(np.arange(0, 15, 0.1), np.arange(0, 10, 0.1))
-rbf = Rbf(x, y, z, function='gaussian', smooth=5.0)
-ZI = rbf(XI, YI)
-#f = interpolate.interp2d(x, y, z, kind='cubic')
-#ZI = f(XI, YI)
+XI, YI = np.meshgrid(np.arange(0, 15.1, 0.1), np.arange(0, 10.1, 0.1))
+#rbf = Rbf(x, y, z, function='multiquadric', epsilon=9.0, smooth=0)
+#rbf = Rbf(x, y, z, epsilon=2)
+#ZI = rbf(XI, YI)
+tck = interpolate.bisplrep(x, y, z, s=0, kx=1, ky=1)
+ZI= interpolate.bisplev(XI[:,0], YI[0,:], tck)
 plt.pcolor(XI, YI, ZI, cmap=cm.jet)
 plt.scatter(x, y, 100, z, cmap=cm.jet, linewidths=1, edgecolors="black")
 #plt.imshow(np.sqrt(x ** 2 + y ** 2), cmap=cm.jet)
