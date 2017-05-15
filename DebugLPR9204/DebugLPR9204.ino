@@ -34,8 +34,28 @@ void loop() {
   read_serial(1000); // Welcome
   read_serial(1000); // Welcome
   Serial.flush();
+  Serial.println("SKINFO");
+  read_serial(1000); // Welcome
+  read_serial(1000); // Welcome
+  read_serial(1000); // Welcome
+  Serial.flush();
   digitalWrite(RED_LED, HIGH);
   delay(1000);
+}
+
+
+void setup_lpr9204() {
+  Serial.flush();
+  Serial.println("SKSREG S01 0020"); // ID
+  Serial.flush();
+  Serial.println("SKSREG S08 34"); // 周波数
+  Serial.flush();
+  Serial.println("SKSREG S20 1"); // オートロード機能フラグ
+  Serial.flush();
+  Serial.println("SKSREG S26 4"); // 0:9600 4:115200
+  Serial.flush();
+  Serial.println("SKSAVE");
+  Serial.flush();
 }
 
 
@@ -97,21 +117,6 @@ bool read_serial( int timeout ) {
   sSerial.print("920 Says> ");
   sSerial.println(serial_read);
   return true;
-}
-
-
-void setup_lpr9204() {
-  Serial.flush();
-  Serial.println("SKSREG S01 0004"); // ID
-  Serial.flush();
-  Serial.println("SKSREG S08 34"); // 周波数
-  Serial.flush();
-  Serial.println("SKSREG S20 1"); // オートロード機能フラグ
-  Serial.flush();
-  Serial.println("SKSREG S26 4"); // 0:9600 4:115200
-  Serial.flush();
-  Serial.println("SKSAVE");
-  Serial.flush();
 }
 
 void sleep_lpr9204() {
