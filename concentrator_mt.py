@@ -3,7 +3,7 @@
 
 '''
  Armadillo上のLPR9204コンセントレータ（マルチスレッド制御）
- 
+
  各ノードから送られてきたデータを受信して、
  足らなければ再送要求して、
  データがそろったら全ノードを60-かかった秒だけ寝かせる
@@ -157,11 +157,11 @@ def _send_packet_and_get_message_id( command ):
  ack_message_queueから対象のmessage_idを含むACK結果を取り出して返します
 '''
 def pop_ack_message( sent_message_id ):
-    print("POP ack message : ", end="")
-    print(ack_message_queue)
+#    print("POP ack message : ", end="")
+#    print(ack_message_queue)
     for ack in ack_message_queue: # ack[0] = STATUS, ack[1] = MSG_ID
-        print("Test : " + ack[1]+ " / Target :", end="")
-        print(sent_message_id)
+#        print("Test : " + ack[1]+ " / Target :", end="")
+#        print(sent_message_id)
         if( ack[1] in sent_message_id ):
             ack_message_queue.remove(ack)
             sent_message_id.remove(ack[1])
@@ -207,5 +207,3 @@ e_arq.set()
 th_rec.join()
 
 sys.exit()
-
-

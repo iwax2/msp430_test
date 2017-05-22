@@ -355,4 +355,14 @@ void print_packet() {
 }
 
 
+bool blink_times( int times ) {
+  for ( int i = 0; i < times; i++ ) {
+    digitalWrite(RED_LED, HIGH);
+    delay(300);
+    digitalWrite(RED_LED, LOW);
+    delay(300);
+  }
+}
+
+
 

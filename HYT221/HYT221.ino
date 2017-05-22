@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include "lpr9204.h"
 #define HYT_ADDR 0x28
-#define BAUDRATE 115200
+#define BAUDRATE 9600
 
 double humidity = 98.76;
 double temperature = 12.34;
@@ -31,17 +31,18 @@ void loop() {
     if ( !read_serial(30 * 1000) ) { // 30秒以上応答がなければbreakする
       sleep_time = 30;
       packet_id = (packet_id + 1) % 10; // n+1される
+      blink_times(10);
       break;
     }
     if ( event_is("ERXDATA") ) {
       if ( command_is("RSEND") ) {
+        blink_times(3);
         int pid = request_for_me(my_id); // packet_IDは0～9
         if ( pid >= 0 ) {
           send_temperature_until_ack_lpr9204( pid, temperature, humidity );
         }
       } else if ( command_is("SLEEP") ) {
         int p = get_packet_id();
-        blink_times(p + 1);
         if ( p < 0 ) {
           packet_id = (packet_id + 1) % 10; // n+1される
         } else {
@@ -58,8 +59,6 @@ void loop() {
     }
   }
   delay(1000);
-  //  delay(3000);
-  //  blink_times(sleep_time);
   sleep_lpr9204();
   digitalWrite(RED_LED, HIGH);
   for ( int i = 0; i < 100; i++ ) {
@@ -98,17 +97,5 @@ bool get_temperature_by_wire() {
   Wire.endTransmission();           // End transmission and release I2C bus
   return (is_available);
 }
-
-bool blink_times( int times ) {
-  for ( int i = 0; i < times; i++ ) {
-    digitalWrite(RED_LED, HIGH);
-    delay(200);
-    digitalWrite(RED_LED, LOW);
-    delay(200);
-  }
-  digitalWrite(RED_LED, HIGH);
-
-}
-
 
 
