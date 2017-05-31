@@ -1,137 +1,125 @@
+#include <Wire.h>
 #include "lpr9204.h"
+#define HYT_ADDR 0x28
+#define BAUDRATE 115200
 #include <SoftwareSerial.h>
 
-char serial_read[SERIAL_BUFFER];
-//                    012345678901234567890123456789012345
-//                    SKSEND 1 1000 0001 0D n,22.22,55.55\0
-SoftwareSerial sSerial(P2_5, P2_4); // RX, TX
-//SoftwareSerial sSerial(10, 11); // RX, TX
 double humidity = 98.76;
 double temperature = 12.34;
 int packet_id = 0;
+int my_id = 0;
+SoftwareSerial sSerial(8, 9); // RX, TX
 
 void setup() {
   pinMode(RED_LED, OUTPUT);
   digitalWrite(RED_LED, LOW);
-  Serial.begin(115200); // Communication with LPR9204
-  sSerial.begin(9600); // ソフトウェアシリアルの初期化
-  sSerial.println("Ready");
-  delay(100);
-  sSerial.println("start initialyze");
-  init_lpr9204();
-  sSerial.println("start Setup");
-  setup_lpr9204();
-  sSerial.println("start loop");
+  sSerial.begin(9600);
+  sSerial.println("Ready...");
+  Serial.begin(BAUDRATE); // Communication with LPR9204
+  while (my_id == 0) {
+    my_id = init_lpr9204();
+  }
+  //  Wire.setModule(0);
+  Wire.begin();
+  sSerial.println("setup OK!");
 }
 
 void loop() {
+  int sleep_time = 10;
+  awake_lpr9204();
   digitalWrite(RED_LED, LOW);
-  Serial.flush();
-  Serial.print("SKSEND 1 1000 0001 1 ");
-  Serial.println(packet_id);
-  packet_id = (packet_id + 1) % 10;
-  read_serial(1000); // Welcome
-  read_serial(1000); // Welcome
-  read_serial(1000); // Welcome
-  Serial.flush();
-  Serial.println("SKINFO");
-  read_serial(1000); // Welcome
-  read_serial(1000); // Welcome
-  read_serial(1000); // Welcome
-  Serial.flush();
-  digitalWrite(RED_LED, HIGH);
-  delay(1000);
-}
+  delay(100);
+  //  get_temperature_by_wire();
+  int no_resend = send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
 
-
-void setup_lpr9204() {
-  Serial.flush();
-  Serial.println("SKSREG S01 0020"); // ID
-  Serial.flush();
-  Serial.println("SKSREG S08 34"); // 周波数
-  Serial.flush();
-  Serial.println("SKSREG S20 1"); // オートロード機能フラグ
-  Serial.flush();
-  Serial.println("SKSREG S26 4"); // 0:9600 4:115200
-  Serial.flush();
-  Serial.println("SKSAVE");
-  Serial.flush();
-}
-
-
-/*
-   LPR9204の初期設定
-*/
-int init_lpr9204() {
-  int my_id = 0;
-  pinMode(RESET, OUTPUT);
-  pinMode(WAKEUP, OUTPUT);
-  digitalWrite(RESET, LOW);
-  digitalWrite(WAKEUP, LOW);
-  delay(10);
-  digitalWrite(RESET, HIGH);
-  digitalWrite(WAKEUP, HIGH);
-  read_serial(1000); // Welcome
-  Serial.flush();
-  Serial.println("SKINFO");
-  read_serial(1000); // INFO
-  Serial.flush();
-  return my_id;
-}
-
-/*
-   データを受信待ちにします
-   timeoutを超えるとfalseを返して読み込みを中止します
-   timeoutに-1を指定すると無制限にデータを待ち続けます
-   timeout=10,000で15秒ぐらいなので/1.5してdelayに合わせる
-*/
-bool read_serial( int timeout ) {
-  int t = 0;
-  int i = 0;
-  if ( timeout > 1 ) {
-    timeout = (int)(timeout / 1.5);
-  }
-  serial_read[0] = '\0';
-  while ( true ) {
-    if ( Serial.available() > 0) {
-      char c = Serial.read();
-      if ( i >= (SERIAL_BUFFER - 1) || c == '\n' ) {
-        serial_read[i] = '\0';
+  while (1) {
+    if ( !read_serial(30 * 1000) ) { // 30秒以上応答がなければbreakする
+      sleep_time = 30;
+      packet_id = (packet_id + 1) % 10; // n+1される
+      sSerial.println("break with 30s timeout.");
+      break;
+    }
+    if ( event_is("ERXDATA") ) {
+      sSerial.println("Receive ERXDATA");
+      if ( command_is("RSEND") ) {
+        sSerial.println("Receive RSEND");
+        int pid = request_for_me(my_id); // packet_IDは0～9
+        if ( pid >= 0 ) {
+          sSerial.println("Resend! my node data.");
+          send_temperature_until_ack_lpr9204( pid, temperature, humidity );
+        }
+      } else if ( command_is("SLEEP") ) {
+        sSerial.println("Receive SLEEP");
+        int p = get_packet_id();
+        if ( p < 0 ) {
+          packet_id = (packet_id + 1) % 10; // n+1される
+        } else {
+          packet_id = p;
+        }
+        int s = get_sleep_time();
+        if ( s == 0 ) {
+          sleep_time = 50;
+        } else {
+          sleep_time = s;
+        }
+        sSerial.print("SLEEP ");
+        sSerial.println(sleep_time);
         break;
-      } else {
-        serial_read[i++] = c;
       }
-    } else if ( t >= timeout && timeout > 0 ) {
-      sSerial.print(t);
-      sSerial.println(" times Timeout!");
-      return false;
-    } else {
-      t++;
-      delay(1);
     }
   }
-  // CRの削除
-  if (strlen(serial_read) > 0) {
-    serial_read[strlen(serial_read) - 1] = '\0';
+  delay(1000);
+  //  delay(3000);
+  //  blink_times(sleep_time);
+  sleep_lpr9204();
+  digitalWrite(RED_LED, HIGH);
+  for ( int i = 0; i < 100; i++ ) {
+    delay( sleep_time * 10 );
   }
-  sSerial.print("920 Says> ");
-  sSerial.println(serial_read);
-  return true;
 }
 
-void sleep_lpr9204() {
-  sSerial.print("MSP Sends> ");
-  sSerial.println("SKDEEPSLEEP"); // SKSLEEPはESLEEPやEWAKEを返さないと書いてあるけど返ってきてる気がする
-  Serial.flush();
-  Serial.println("SKDEEPSLEEP");
-  Serial.flush();
+
+
+bool get_temperature_by_wire() {
+  bool is_available = false;
+  Wire.beginTransmission(HYT_ADDR);   // Begin transmission with given device on I2C bus
+  Wire.requestFrom(HYT_ADDR, 4);      // Request 4 bytes
+  if (Wire.available() == 4) {
+    int b1 = Wire.read();
+    int b2 = Wire.read();
+    int b3 = Wire.read();
+    int b4 = Wire.read();
+
+    int rawHumidity = b1 << 8 | b2;
+    rawHumidity =  (rawHumidity &= 0x3FFF);
+    humidity = 100.0 / pow(2, 14) * rawHumidity;
+
+    b4 = (b4 >> 2); // Mask away 2 least significant bits see HYT 221 doc
+    int rawTemperature = b3 << 6 | b4;
+    temperature = 165.0 / pow(2, 14) * rawTemperature - 40;
+
+    //    sSerial.print(humidity);
+    //    sSerial.print("% - Temperature: ");
+    //    sSerial.println(temperature);
+    is_available = true;
+  } else {
+    //    Serial.println("Not enough bytes available on wire.");
+    is_available = false;
+  }
+  Wire.endTransmission();           // End transmission and release I2C bus
+  return (is_available);
 }
 
-void awake_lpr9204() {
-  digitalWrite(WAKEUP, LOW);
-  delay(10); // min 5msのWAKEUP入力が必要（立ち上がりエッジで起動）
-  digitalWrite(WAKEUP, HIGH);
-  delay(10); // max 5msで起動
-  while ( read_serial( 1000 ) ); // SLEEP時に発行したSKSLEEPを受け取る
+bool blink_times( int times ) {
+  for ( int i = 0; i < times; i++ ) {
+    digitalWrite(RED_LED, HIGH);
+    delay(200);
+    digitalWrite(RED_LED, LOW);
+    delay(200);
+  }
+  digitalWrite(RED_LED, HIGH);
+
 }
+
+
 

@@ -10,10 +10,6 @@
 
 #define RESET P2_1
 #define WAKEUP P2_2
-//#define RED_LED 13
-//#define RESET 2
-//#define WAKEUP 3
-
 
 struct packet_t {
   unsigned int origin; // 受信したデータの送信元ID
@@ -44,5 +40,6 @@ void send_debug_message( int error_no );
 void sleep_lpr9204();
 void awake_lpr9204();
 void d22tostr( int index, double d );
+bool blink_times( int times );
 
 #endif
