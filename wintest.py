@@ -64,7 +64,7 @@ def receive_packet(e):
  3. データが揃えばスレッド終了
 '''
 def automatic_repeat_request(e, packet_number):
-    coordinate.clear()
+    coordinate.clear() # 今回取得すべき座標一覧
     with codecs.open( NODE_LIST_FILE, 'r', 'utf-8' ) as f:
         for line in f:
             line = line.strip()
@@ -73,16 +73,16 @@ def automatic_repeat_request(e, packet_number):
                 data = comment[0].split(',')
                 coordinate[data[0]] = (data[1], data[2])
                 print(data)
-    accepted_node_list = [] # 対象のパケット番号で受理したパケットの管理用
     start_sec = datetime.now().second
-    # 管理していないノードから送られてきたパケットも受け取ってしまうので長さだとほしいデータがとれないかも
-    while( len(accepted_packets) < len(coordinate) and not e.isSet() ):
+    # 座標情報
+    while( len(coordinate) > 0 and not e.isSet() ):
         if( len(received_packets)>0 ):
             packet = received_packets.popleft()
-            if( packet[1] == packet_number ):
-                # ここで対象ノード以外からのパケットははじく？
+            # 対象のパケットIDでかつ、対象の座標である
+            if( packet[1] == packet_number and packet[0] in cordinate ):
+                cord = cordinate.pop(packet[0]) # 座標情報の更新
+                packet += cord # パケットに座標情報を付与
                 accepted_packets.append(packet)
-                accepted_node_list.append(packet[0])
                 print("Packet is captured from : " + packet[0])
             else:
                 print("[Information] lost packet : (" + packet[0] +","+ str(packet[1]) +","+ packet[2] +","+ packet[3] +") / Current PacketID: "+str(packet_number))
@@ -90,8 +90,10 @@ def automatic_repeat_request(e, packet_number):
             if( datetime.now().second - start_sec > 5 ):
                 start_sec = datetime.now().second # 前回の実行から5秒以上経っていれば再送要求する
                 for node in coordinate:
-                    if node not in accepted_node_list:
-                        send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
+                    send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
+                    if e.isSet() # 再送制御中にスレッドが残ることがあるので止める
+                        break
+
 
 '''
  パケット送信（×再送制御）
@@ -192,11 +194,13 @@ try:
         broadcast_packet("SKBC 3 1000 0F SLEEP_ALL_,"+str(packet_number)+","+str(sleep_time))
         date = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
         for packet in accepted_packets:
-            csv = date+','+','+packet[2]+','+packet[3] # packet = (send_id, packet_number, temp, humi)
+            # packet = (send_id, packet_number, temp, humi, x_pos, y_pos)
+            csv = date+','+','+packet[1]+','+packet[4]+','+packet[5]+','+packet[2]+','+packet[3]
             with open('temperature_'+ packet[0] +'.csv','a') as f:
                 f.write(csv+'\r\n')
         accepted_packets.clear()
         print("[Information] Sleep...."+str(sleep_time)+" s")
+        # 変な時間に起きた子に対応するスレッドをここに書く
         sleep(sleep_time)
         print("[Information] Wakeup!")
 
