@@ -16,7 +16,6 @@ from datetime import datetime
 from collections import deque
 from time import sleep
 
-NO_NODES = 3
 NODE_LIST_FILE = 'node_list.txt'
 
 received_packets = deque() # パケット保存用キュー
@@ -88,14 +87,15 @@ def automatic_repeat_request(e, packet_number):
             else:
                 print("[Information] lost packet : (" + packet[0] +","+ str(packet[1]) +","+ packet[2] +","+ packet[3] +") / Current PacketID: "+str(packet_number))
         else: # パケットが届いている間は再送要求を送らない
-            if( datetime.now().second - start_sec > 10 ):
-                start_sec = datetime.now().second # 前回の実行から10秒以上経っていれば再送要求する
+            if( datetime.now().second - start_sec > 5 ):
+                start_sec = datetime.now().second # 前回の実行から5秒以上経っていれば再送要求する
                 for node in coordinate:
                     if node not in accepted_node_list:
                         send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
 
 '''
- パケット送信（再送制御つき）
+ パケット送信（×再送制御）
+ IoTノードが寝てるときに再送制御してもずっと寝てるので再送してもあまり意味は無い
  メソッド側で改行コードは面倒を見ます
 '''
 def send_packet( command ):
@@ -107,14 +107,16 @@ def send_packet( command ):
     message_id = _send_packet_and_get_message_id( command )
     sent_message_id.add(message_id)
     number_of_sent_packets = 1
-    while number_of_sent_packets < 5:
+    
+    # 一回ぐらいは再送してみる
+    while number_of_sent_packets < 2:
         if( len(ack_message_queue) > 0 ):
             ack_message = pop_ack_message( sent_message_id )
             if( ack_message == '1' ):
                 break
             elif( len(ack_message_queue) < 1 or ack_message == '0' ): # ackキューが空/ackメッセージが0なら再送
                 print("[Resend because of  nack] "+command)
-                sleep(2)
+#                sleep(2)
                 message_id = _send_packet_and_get_message_id( command )
                 sent_message_id.add(message_id)
                 number_of_sent_packets += 1
