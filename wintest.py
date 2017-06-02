@@ -26,7 +26,8 @@ ack_message_queue = deque() # EACKメッセージ保存用キュー
 message_id_queue = deque()  # 920が割り振るメッセージID保存用キュー
 error_code_queue = deque()  # FAIL ER10などのエラーコード保存用キュー
 
-s = serial.Serial('/dev/ttymxc1', 115200, timeout=1)
+#s = serial.Serial('/dev/ttymxc1', 115200, timeout=1)
+s = serial.Serial('COM4', 115200, timeout=1)
 packet_number = 0
 
 '''

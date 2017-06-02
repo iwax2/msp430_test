@@ -118,10 +118,10 @@ ZI = rbf(XI, YI)
 #ZI= interpolate.bisplev(XI[:,0], YI[0,:], tck)
 plt.pcolor(XI, YI, ZI, cmap=cm.jet)
 #plt.pcolor(x, y, z, cmap=cm.jet)
-#plt.scatter(x, y, 100, z, cmap=cm.jet, linewidths=1, edgecolors="black")
+plt.scatter(x, y, 100, z, cmap=cm.jet, linewidths=1, edgecolors="black")
 #plt.imshow(np.sqrt(x ** 2 + y ** 2), cmap=cm.jet)
 #plt.imshow(z, cmap=cm.jet)
-print(ZI)
+#print(ZI)
 
 
 # 参考 http://seesaawiki.jp/met-python/d/matplotlib
