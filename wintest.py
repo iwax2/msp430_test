@@ -26,7 +26,7 @@ message_id_queue = deque()  # 920が割り振るメッセージID保存用キュ
 error_code_queue = deque()  # FAIL ER10などのエラーコード保存用キュー
 
 #s = serial.Serial('/dev/ttymxc1', 115200, timeout=1)
-s = serial.Serial('COM4', 115200, timeout=1)
+s = serial.Serial('COM3', 115200, timeout=1)
 packet_number = 0
 
 '''
@@ -79,9 +79,9 @@ def automatic_repeat_request(e, packet_number):
         if( len(received_packets)>0 ):
             packet = received_packets.popleft()
             # 対象のパケットIDでかつ、対象の座標である
-            if( packet[1] == packet_number and packet[0] in cordinate ):
-                cord = cordinate.pop(packet[0]) # 座標情報の更新
-                packet += cord # パケットに座標情報を付与
+            if( packet[1] == packet_number and packet[0] in coordinate ):
+                coord = coordinate.pop(packet[0]) # 座標情報の更新
+                packet += coord # パケットに座標情報を付与
                 accepted_packets.append(packet)
                 print("Packet is captured from : " + packet[0])
             else:
@@ -91,7 +91,7 @@ def automatic_repeat_request(e, packet_number):
                 start_sec = datetime.now().second # 前回の実行から5秒以上経っていれば再送要求する
                 for node in coordinate:
                     send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
-                    if e.isSet() # 再送制御中にスレッドが残ることがあるので止める
+                    if( e.isSet() ): # 再送制御中にスレッドが残ることがあるので止める
                         break
 
 
@@ -195,7 +195,7 @@ try:
         date = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
         for packet in accepted_packets:
             # packet = (send_id, packet_number, temp, humi, x_pos, y_pos)
-            csv = date+','+','+packet[1]+','+packet[4]+','+packet[5]+','+packet[2]+','+packet[3]
+            csv = date+','+str(packet[1])+','+packet[4]+','+packet[5]+','+packet[2]+','+packet[3]
             with open('temperature_'+ packet[0] +'.csv','a') as f:
                 f.write(csv+'\r\n')
         accepted_packets.clear()

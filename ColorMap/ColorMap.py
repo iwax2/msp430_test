@@ -13,7 +13,7 @@ from scipy.interpolate import Rbf # RBF補間
 import matplotlib.cm as cm # カラーバーの設定
 
 # 参考 http://www.mwsoft.jp/programming/numpy/csv.html
-data = np.loadtxt("html_20170529.txt", delimiter="\t", dtype=np.float64, usecols=(0,1,3)) # , filling_values=(0, 0, 0) 
+data = np.loadtxt("html_20170529.txt", delimiter="\t", dtype=np.float64, usecols=(0,1,2)) # , filling_values=(0, 0, 0) 
 #data = np.loadtxt("assmann_20170302.txt", delimiter="\t", dtype=np.float64, usecols=(0,1,2)) # , filling_values=(0, 0, 0) 
 #data = np.loadtxt("windspeed_test.txt", delimiter="\t", dtype=np.float64, usecols=(0,1,2)) # , filling_values=(0, 0, 0) 
 
@@ -125,9 +125,10 @@ plt.scatter(x, y, 100, z, cmap=cm.jet, linewidths=1, edgecolors="black")
 
 
 # 参考 http://seesaawiki.jp/met-python/d/matplotlib
-#plt.title("Temperature [${}^\circ$C]", fontsize=16)
-plt.title("Humidity [%]", fontsize=16)
+plt.title("Temperature [${}^\circ$C]", fontsize=16)
+#plt.title("Humidity [%]", fontsize=16)
 plt.axis([1,15,1,10])
+plt.clim(25,30)
 #plt.locator_params(axis='both', tight=True, nbins=10)
 plt.colorbar()
 plt.savefig('matplotlib.png', transparent=True, dpi=80)
