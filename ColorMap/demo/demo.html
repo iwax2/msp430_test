@@ -1,0 +1,21 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <script type="text/javascript">
+    function reloadimg(e,timer){ 
+        setTimeout( function(){
+            e.src = "colormap.png?r=" + Math.random(); 
+        },timer); 
+    }
+  </script>
+</head>
+<body>
+<!--
+<meta http-equiv="Refresh" content="1200">
+-->
+
+<img src="colormap.png" onload="reloadimg(this,1000)" onerror="reloadimg(this,5000)" />
+
+</body>
+</html>
+
