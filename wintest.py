@@ -12,6 +12,7 @@ import serial
 import sys
 import threading
 import codecs
+import subprocess
 from datetime import datetime
 from collections import deque
 from time import sleep
@@ -196,6 +197,17 @@ def pop_ack_message( sent_message_id ):
             return ack[0] # ack_status '0' or '1'
     return '0' # ACKが受け取れていないので'0'を返して再送
 
+'''
+ Sonntag近似式を使って飽和水蒸気圧[Pa]を求めます
+'''
+def temp2svp( temp ):
+    temp = temp+273.15
+    a = -6096.9385 / temp
+    b = 16.635794
+    c = -2.711193 / 100 * temp
+    d = 1.673952 / 100000 * temp * temp
+    e = 2.433502 * math.log(temp)
+    return( math.exp( a + b + c + d + e ) * 100 )
 
 '''
  メインスレッド
@@ -215,11 +227,25 @@ try:
         packet_number = ( packet_number+1 ) % 10
         sleep_time = broadcast_sleep_all(2)
         date = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
-        for packet in accepted_packets:
-            # packet = (send_id, packet_number, temp, humi, x_pos, y_pos)
-            csv = date+','+str(packet[1])+','+packet[4]+','+packet[5]+','+packet[2]+','+packet[3]
-            with open('temperature_'+ packet[0] +'.csv','a') as f:
+        with open('matrix_temp.txt','w') as f:
+            for packet in accepted_packets:
+                # packet = (send_id, packet_number, temp, humi, x_pos, y_pos)
+                csv = packet[4]+' '+packet[5]+' '+packet[2]
                 f.write(csv+'\r\n')
+        with open('matrix_vpd.txt','w') as f:
+            for packet in accepted_packets:
+                # packet = (send_id, packet_number, temp, humi, x_pos, y_pos)
+                temp = float(data[2])
+                humi = float(data[3])
+                svp = temp2svp(temp) # Saturated Vapor Pressure [Pa]
+                vp = svp * humi / 100 # Vapor Pressure [Pa]
+                vpd = (svp-vp)/1000  # Vapour Pressure Dificit [kPa]
+                csv = packet[4]+' '+packet[5]+' '+str(vpd)
+                f.write(csv+'\r\n')
+
+        subprcess.run("gnuplot", "./ColorMap/dgrid3d_temp.plt")
+        subprcess.run("gnuplot", "./ColorMap/dgrid3d_vpd.plt")
+
         accepted_packets.clear()
         sleep(1)
         e_slp.set()

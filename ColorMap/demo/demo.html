@@ -2,9 +2,9 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <script type="text/javascript">
-    function reloadimg(e,timer){ 
+    function reloadimg(e,timer,fname){ 
         setTimeout( function(){
-            e.src = "colormap.png?r=" + Math.random(); 
+            e.src = fname+"?r=" + Math.random(); 
         },timer); 
     }
   </script>
@@ -14,7 +14,8 @@
 <meta http-equiv="Refresh" content="1200">
 -->
 
-<img src="colormap.png" onload="reloadimg(this,1000)" onerror="reloadimg(this,5000)" />
+<img src="colormap_temp.png" onload="reloadimg(this,1000,'colormap_temp.png')" onerror="reloadimg(this,5000,'colormap_temp.png')" width="600"/>
+<img src="colormap_vpd.png" onload="reloadimg(this,1000,'colormap_vpd.png')" onerror="reloadimg(this,5000,'colormap_vpd.png')" width="600" />
 
 </body>
 </html>
