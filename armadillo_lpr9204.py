@@ -10,7 +10,9 @@ from time import sleep
 
 NODE_LIST_FILE = 'node_list.txt'
 
-s = serial.Serial('/dev/ttymxc1', 115200, timeout=1)
+#s = serial.Serial('/dev/ttymxc1', 115200, timeout=1)
+#s = serial.Serial('/dev/tty.usbserial-AL00MUQ0', 115200, timeout=1)
+s = serial.Serial('COM7', 115200, timeout=1)
 
 coordinate = {}
 
@@ -20,15 +22,17 @@ def read_serial():
         if( line.startswith('E') ):
             data = line.split()
             if( len(data)>=8 and data[0] == 'ERXDATA' ):
-                date    = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
-                send_id = data[1]
-                t_and_h = data[7].split(',')
-                temp    = t_and_h[0]
-                humi    = t_and_h[1]
-                csv     = date+','+ send_id +','+temp+','+humi
-                print(csv)
-                with open('temperature_'+ send_id +'.csv','a') as f:
-                    f.write(csv+'\r\n')
+                t_and_h = data[7].split(',') # n,temp,humi
+                if( len(t_and_h)>=3 ):
+                    date    = datetime.now().strftime("%Y/%m/%d,%H:%M:%S")
+                    send_id = data[1]
+                    temp    = t_and_h[1]
+                    humi    = t_and_h[2]
+                    csv     = date+','+ send_id +','+temp+','+humi
+                    print(csv)
+#                    with open('temperature_'+ send_id +'.csv','a') as f:
+                    with open('korokoro_20170830.csv','a') as f:
+                        f.write(csv+'\r\n')
 
 def write_serial():
     packet_number = 0
@@ -53,9 +57,9 @@ def read_settings():
 
 
 try:
-    #read_serial()
+    read_serial()
     #write_serial()
-   read_settings()
+    #read_settings()
 except KeyboardInterrupt:
     print("W: interrupt received, stopping script")
 finally:
