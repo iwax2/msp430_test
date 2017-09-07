@@ -239,7 +239,7 @@ try:
                 humi = float(data[3])
                 svp = temp2svp(temp) # Saturated Vapor Pressure [Pa]
                 vp = svp * humi / 100 # Vapor Pressure [Pa]
-                vpd = (svp-vp)/1000  # Vapour Pressure Dificit [kPa]
+                vpd = (svp-vp)/1000  # Vapour Pressure Deficit [kPa]
                 csv = packet[4]+' '+packet[5]+' '+str(vpd)
                 f.write(csv+'\r\n')
 
