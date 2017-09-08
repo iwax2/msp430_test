@@ -23,7 +23,9 @@ from time import sleep
 NODE_LIST_FILE = '/home/iwata/node_list.txt'
 PID_FILE = '/var/run/concentratord.pid'
 OUTPUT_FILE = '/home/iwata/temp_humi_'
+INTERMITTENT_TIME = 60
 
+serial_readline = deque() # シリアルデータ
 received_packets = deque() # パケット保存用キュー
 accepted_packets = [] # 受理したパケット保存用リスト
 coordinate = {} # 各ノードの座標保管用ディクショナリ (16進4桁ノードID, x座標, y座標)
@@ -45,9 +47,19 @@ fiap = pyfiap.fiap.APP("http://ants.jga.kisarazu.ac.jp/axis2/services/FIAPStorag
 '''
 def receive_packet(e, ):
     while not e.isSet():
-        if( s.inWaiting() > 0 ):
+        if( s.readable() and s.in_waiting > 0 ):
+#            data = s.read(s.in_waiting)
+#            print("Serial>"+str(data))
+#            line = data.decode('utf-8').rstrip()
             line = s.readline().decode('utf-8').rstrip()
-            print("    920 Says>"+ line)
+            print("920>"+ line)
+            serial_readline.append(line)
+
+def routing_packet(e, ):
+    while not e.isSet():
+        if( len(serial_readline) > 0 ):
+            line = serial_readline.popleft();
+#            print("920>"+ line)
             data = line.split()
             if( len(data)>=8 and data[0] == 'ERXDATA' ):
                 send_id = data[1]
@@ -93,9 +105,13 @@ def automatic_repeat_request(e, packet_number):
                 coord = coordinate.pop(packet[0]) # 座標情報の更新
                 packet += coord # パケットに座標情報を付与
                 accepted_packets.append(packet)
-#                print("Packet is captured from : " + packet[0])
+                print("Captured: " + packet[0] + " and Remaining : ", end="" )
+                print(coordinate.keys())
 #            else:
 #                print("[Information] lost packet : (" + packet[0] +","+ str(packet[1]) +","+ packet[2] +","+ packet[3] +") / Current PacketID: "+str(packet_number))
+#                print("packet[1] == packet_number", packet[1] == packet_number)
+#                print("packet[0] in coordinate", packet[0] in coordinate)
+''' 再送制御なし（バグる）
         else: # パケットが届いている間は再送要求を送らない
             if( datetime.now().second - start_sec > 10 ):
                 start_sec = datetime.now().second # 前回の実行から5秒以上経っていれば再送要求する
@@ -103,6 +119,7 @@ def automatic_repeat_request(e, packet_number):
                     send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
                     if( e.isSet() ): # 再送制御中にスレッドが残ることがあるので止める
                         break
+'''
 
 '''
  寝ているときに受け取ったパケットを処理する(insleep)スレッド
@@ -155,7 +172,7 @@ def send_packet( command ):
  sleep_allを発信
 '''
 def broadcast_sleep_all( no_resend ):
-    sleep_time = 60 - datetime.now().second
+    sleep_time = INTERMITTENT_TIME - datetime.now().second
     str_st = '{0:02d}'.format(sleep_time)
     # SLEEPはブロードキャスト（最大3ホップ）で送信
     broadcast_packet("SKBC 3 1000 0F SLEEP_ALL_,"+str(packet_number)+","+str_st, no_resend)
@@ -223,8 +240,12 @@ def main_thread():
     e_rec = threading.Event()
     e_arq = threading.Event()
     e_slp = threading.Event()
+    e_rec.clear()
     th_rec = threading.Thread(name='rec', target=receive_packet, args=(e_rec,))
     th_rec.start()
+    th_route = threading.Thread(name='route', target=routing_packet, args=(e_rec,))
+    th_route.start()
+    print("Start threading!")
     try:
         while True:
             e_arq.clear()
@@ -237,6 +258,7 @@ def main_thread():
             now  = datetime.now()
             day  = now.strftime("%Y%m%d")
             date = now.strftime("%H:%M:%S")
+            fiap_upload = []
             for packet in accepted_packets:
                 # packet = (send_id, packet_number, temp, humi, x_pos, y_pos)
                 send_id = packet[0]
@@ -249,21 +271,25 @@ def main_thread():
                 vp = svp * humi / 100 # Vapor Pressure [Pa]
                 vpd = (svp-vp)/1000   # Vapour Pressure Dificit [kPa]
                 csv = date+'\t'+str(temp)+'\t'+str(humi)+'\t'+str(vpd)
-                with open(OUTPUT_FILE + send_id + '_' + day, 'a') as f:
+                with open(OUTPUT_FILE + send_id + '_' + day+'.csv', 'a') as f:
                     f.write(csv+'\r\n')
-                fiap.write([['http://iwata.com/IWATA/temp_'+posit, temp, now]])
-                fiap.write([['http://iwata.com/IWATA/humi_'+posit, humi, now]])
-                fiap.write([['http://iwata.com/IWATA/VPD_'+posit,   vpd, now]])
+                fiap_upload.append(['http://iwata.com/IWATA/temp_'+posit, temp, now])
+                fiap_upload.append(['http://iwata.com/IWATA/humi_'+posit, humi, now])
+                fiap_upload.append(['http://iwata.com/IWATA/VPD_' +posit, vpd,  now])
+                print(send_id+":"+posit+", ",end="")
+            if( len(fiap_upload) > 0 ):
+                fiap.write(fiap_upload)
             accepted_packets.clear()
-            sleep(1)
+#            sleep(1)
             e_slp.set()
             th_slp = threading.Thread(name='insleep', target=insleep_automatic_repeat_request, args=(e_slp, packet_number))
             th_slp.start()
+            sleep_time = INTERMITTENT_TIME - datetime.now().second
             if( sleep_time > 3 ): # sleepが2秒分あって、その他1秒換算
                 sleep_time -= 3
-            print("[Information] Sleep...."+str(sleep_time)+" s")
+            print(" Sleep...."+str(sleep_time)+" s")
             sleep(sleep_time)
-#            print("[Information] Wakeup!")
+            print("[Information] Wakeup!")
             e_slp.clear()
 
     except KeyboardInterrupt:
