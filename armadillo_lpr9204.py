@@ -31,7 +31,7 @@ def read_serial():
                     csv     = date+','+ send_id +','+temp+','+humi
                     print(csv)
 #                    with open('temperature_'+ send_id +'.csv','a') as f:
-                    with open('korokoro_20170830.csv','a') as f:
+                    with open('korokoro_20170909.csv','a') as f:
                         f.write(csv+'\r\n')
 
 def write_serial():

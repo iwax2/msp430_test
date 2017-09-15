@@ -23,7 +23,7 @@ void loop() {
   int sleep_time = 10;
   awake_lpr9204();
   digitalWrite(RED_LED, LOW);
-  delay(100);
+  delay(my_id*10); // ずらす
   get_temperature_by_wire();
   int no_resend = send_temperature_until_ack_lpr9204( packet_id, temperature, humidity );
 
