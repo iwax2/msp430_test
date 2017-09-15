@@ -46,29 +46,36 @@ fiap = pyfiap.fiap.APP("http://ants.jga.kisarazu.ac.jp/axis2/services/FIAPStorag
          FROM DEST MID  SEL  RS LEN DATA RUT1 RUT2
 '''
 def receive_packet(e, ):
+    data = ""
     while not e.isSet():
         if( s.readable() and s.in_waiting > 0 ):
-#            data = s.read(s.in_waiting)
-#            print("Serial>"+str(data))
-#            line = data.decode('utf-8').rstrip()
-            line = s.readline().decode('utf-8').rstrip()
-            print("920>"+ line)
-            serial_readline.append(line)
+            data = data + s.read(s.in_waiting).decode('utf-8')
+#            print("Serial>"+data)
+            if( '\r\n' in data ):
+                lines = data.split('\r\n')
+                data = lines[len(lines)-1]
+                lines[len(lines)-1] = ""
+                for line in lines:
+                    if( len(line) > 1 ):
+                        serial_readline.append(line)
+#                        print("SerialLine>"+line)
+#            line = s.readline().decode('utf-8').rstrip()
 
 def routing_packet(e, ):
     while not e.isSet():
         if( len(serial_readline) > 0 ):
             line = serial_readline.popleft();
-#            print("920>"+ line)
-            data = line.split()
+            print("   920>"+ line)
+            data = line.rstrip().split()
             if( len(data)>=8 and data[0] == 'ERXDATA' ):
-                send_id = data[1]
                 t_and_h = data[7].split(',')
-                p_id   = int(t_and_h[0]) # packet_id
-                temp   = t_and_h[1]
-                humi   = t_and_h[2]
-                packet = (send_id, p_id, temp, humi)
-                received_packets.append(packet)
+                if( len(t_and_h) >= 3 ):
+                    send_id = data[1]
+                    p_id   = int(t_and_h[0]) # packet_id
+                    temp   = t_and_h[1]
+                    humi   = t_and_h[2]
+                    packet = (send_id, p_id, temp, humi)
+                    received_packets.append(packet)
             elif( len(data)>=4 and data[0] == 'EACK' ):
                 ack_result = ( data[1], data[3] ) # STATUS, MSG_ID
                 ack_message_queue.append( ack_result )
@@ -100,6 +107,8 @@ def automatic_repeat_request(e, packet_number):
 #        print(str(datetime.now().second))
         if( len(received_packets)>0 ):
             packet = received_packets.popleft()
+            print("Packet>",end="")
+            print(packet)
             # 対象のパケットIDでかつ、対象の座標である
             if( packet[1] == packet_number and packet[0] in coordinate ):
                 coord = coordinate.pop(packet[0]) # 座標情報の更新
@@ -111,26 +120,29 @@ def automatic_repeat_request(e, packet_number):
 #                print("[Information] lost packet : (" + packet[0] +","+ str(packet[1]) +","+ packet[2] +","+ packet[3] +") / Current PacketID: "+str(packet_number))
 #                print("packet[1] == packet_number", packet[1] == packet_number)
 #                print("packet[0] in coordinate", packet[0] in coordinate)
-''' 再送制御なし（バグる）
         else: # パケットが届いている間は再送要求を送らない
-            if( datetime.now().second - start_sec > 10 ):
+            if( datetime.now().second - start_sec > 5 ):
                 start_sec = datetime.now().second # 前回の実行から5秒以上経っていれば再送要求する
                 for node in coordinate:
-                    send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
                     if( e.isSet() ): # 再送制御中にスレッドが残ることがあるので止める
                         break
-'''
+                    send_packet("SKSEND 1 1000 "+node+" 0C RSEND,"+node+","+str(packet_number))
 
 '''
  寝ているときに受け取ったパケットを処理する(insleep)スレッド
  @args packet_number 次のパケットのデータであれば寝かさず起こしておく
 '''
 def insleep_automatic_repeat_request(e_slp, packet_number):
+    sec = 0
     while( e_slp.isSet() ):
         if( len(received_packets)>0 ):
             packet = received_packets.popleft()
             if( packet[1] != packet_number ): # でたらめなパケットIDのデータが届けばsleepさせる
-                sleep_time = broadcast_sleep_all(1)
+#                sleep_time = broadcast_sleep_all(1)
+                now = datetime.now().second
+                if( now - sec > 2 ):
+                    sec = now # 前回の実行から2秒以上経っていれば送信する
+                    sleep_time = broadcast_sleep_all(1)
             else: # 次のパケットならもう一回received_packetsに入れてぐーるぐる
                 received_packets.append(packet)
 
@@ -149,6 +161,7 @@ def send_packet( command ):
     sent_message_id.add(message_id)
     number_of_sent_packets = 1
     
+'''
     # 一回ぐらいは再送してみる
     while number_of_sent_packets < 2:
         if( len(ack_message_queue) > 0 ):
@@ -167,12 +180,15 @@ def send_packet( command ):
             message_id = _send_packet_and_get_message_id( command )
             sent_message_id.add(message_id)
             number_of_sent_packets += 1
+'''
 
 '''
  sleep_allを発信
 '''
 def broadcast_sleep_all( no_resend ):
     sleep_time = INTERMITTENT_TIME - datetime.now().second
+    if( sleep_time >= INTERMITTENT_TIME ):
+        sleep_time = 1
     str_st = '{0:02d}'.format(sleep_time)
     # SLEEPはブロードキャスト（最大3ホップ）で送信
     broadcast_packet("SKBC 3 1000 0F SLEEP_ALL_,"+str(packet_number)+","+str_st, no_resend)
@@ -253,6 +269,10 @@ def main_thread():
             th_arq.start()
             th_arq.join(30) # 30秒で打ち切る
             e_arq.set()
+            print("[Information] Finish waiting ARQ thread in main.")
+            e_slp.set()
+            th_slp = threading.Thread(name='insleep', target=insleep_automatic_repeat_request, args=(e_slp, packet_number))
+            th_slp.start()
             packet_number = ( packet_number+1 ) % 10
             sleep_time = broadcast_sleep_all(2)
             now  = datetime.now()
@@ -277,13 +297,10 @@ def main_thread():
                 fiap_upload.append(['http://iwata.com/IWATA/humi_'+posit, humi, now])
                 fiap_upload.append(['http://iwata.com/IWATA/VPD_' +posit, vpd,  now])
                 print(send_id+":"+posit+", ",end="")
-            if( len(fiap_upload) > 0 ):
-                fiap.write(fiap_upload)
+#            if( len(fiap_upload) > 0 ):
+#                fiap.write(fiap_upload)
             accepted_packets.clear()
 #            sleep(1)
-            e_slp.set()
-            th_slp = threading.Thread(name='insleep', target=insleep_automatic_repeat_request, args=(e_slp, packet_number))
-            th_slp.start()
             sleep_time = INTERMITTENT_TIME - datetime.now().second
             if( sleep_time > 3 ): # sleepが2秒分あって、その他1秒換算
                 sleep_time -= 3
@@ -304,6 +321,8 @@ def main_thread():
     sys.exit()
 
 if __name__ == '__main__':
+    main_thread()
+'''
     pid = os.fork()
     if( pid > 0 ):
         f2 = open(PID_FILE,'w')
@@ -312,4 +331,6 @@ if __name__ == '__main__':
         sys.exit()
     if( pid == 0 ):
         main_thread()
+'''
+
 
